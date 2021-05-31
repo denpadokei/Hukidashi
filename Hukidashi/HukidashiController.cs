@@ -1,4 +1,5 @@
-﻿using HMUI;
+﻿using BeatSaberMarkupLanguage;
+using HMUI;
 using Hukidashi.SimpleJson;
 using Hukidashi.WebSockets;
 using System;
@@ -39,7 +40,10 @@ namespace Hukidashi
 
         private void Update()
         {
-            this._hukidashiCanvas.transform.LookAt(Camera.main.transform);
+            if (!_lookTarget) {
+                return;
+            }
+            this._hukidashiCanvas.transform.LookAt(_lookTarget.transform.position);
 #if DEBUG
             if (Input.GetKeyDown(KeyCode.N)) {
                 if (this.shaders.Count <= (uint)this.shaderIndex) {
@@ -47,11 +51,10 @@ namespace Hukidashi
                 }
                 var shader = this.shaders.ElementAt(shaderIndex);
                 Plugin.Log.Debug($"index {shaderIndex}, {shader}");
-                this._hukidashiImage.material.shader = shader;
+                this._hukidashiImage.material = shader;
                 shaderIndex++;
             }
 #endif
-
         }
 
         /// <summary>
@@ -74,6 +77,11 @@ namespace Hukidashi
                 if (this._hukidashiCanvas == null) {
                     var go = new GameObject("HukidashiCanvas", typeof(Canvas), typeof(CurvedCanvasSettings));
                     this._hukidashiCanvas = go.GetComponent<Canvas>();
+                    this._hukidashiCanvas.renderMode = RenderMode.WorldSpace;
+                    this._hukidashiCanvas.transform.localRotation = Quaternion.Euler(0, 180, 0);
+                    (this._hukidashiCanvas.transform as RectTransform).sizeDelta = new Vector2(160, 90);
+                    var curveSetting = go.GetComponent<CurvedCanvasSettings>();
+                    curveSetting.SetRadius(0);
                     var imagego = new GameObject("HukidashiImage", typeof(ImageView));
                     this._hukidashiImage = imagego.GetComponent<ImageView>();
                     var assembly = Assembly.GetExecutingAssembly();
@@ -85,19 +93,45 @@ namespace Hukidashi
                         var rect = new Rect(Vector2.zero, new Vector2(tex.width, tex.height));
                         this._hukidashiImage.sprite = Sprite.Create(tex, rect, Vector2.one / 2);
 #if DEBUG
-                        this.shaders = Resources.FindObjectsOfTypeAll<ImageView>().OrderBy(x => x.name).Select(x => x.material.shader).ToList();
+                        this.shaders = Resources.FindObjectsOfTypeAll<Material>().OrderBy(x => x.name).ToList();
 #endif
-                        this._hukidashiImage.material.shader = Resources.FindObjectsOfTypeAll<Shader>().FirstOrDefault(x => x.name.Contains("CustomUI"));
+                        this._hukidashiImage.material = Resources.FindObjectsOfTypeAll<Material>().FirstOrDefault(m => m.name == "UINoGlow");
+                        
                         this._hukidashiImage.transform.SetParent(_hukidashiCanvas.transform as RectTransform, false);
-                        var vertival = new GameObject().AddComponent<VerticalLayoutGroup>();
-                        vertival.transform.SetParent(this._hukidashiImage.transform as RectTransform, false);
+                        
+                        this._hukidashiImage.rectTransform.sizeDelta = new Vector2(160, 90);
+                        var vertical = new GameObject().AddComponent<VerticalLayoutGroup>();
+                        vertical.transform.SetParent(this._hukidashiImage.transform as RectTransform, false);
+                        
                         this._text = new GameObject().AddComponent<CurvedTextMeshPro>();
-                        this._text.transform.SetParent(vertival.transform as RectTransform, false);
+                        if (FontManager.TryGetTMPFontByFamily("Segoe UI", out var font)) {
+                            this._text.font = GameObject.Instantiate(font);
+                        }
+                        this._text.transform.SetParent(vertical.transform as RectTransform, false);
+                        this._text.alignment = TMPro.TextAlignmentOptions.MidlineLeft;
+                        this._text.rectTransform.sizeDelta = new Vector2(130, 10);
+                        foreach (var item in Resources.FindObjectsOfTypeAll<Material>().OrderBy(x => x.name)) {
+                            Plugin.Log.Debug($"{item}");
+                        }
+
+                        this._text.font.material.shader = BeatSaberUI.MainTextFont.material.shader;
+                        this._text.enableWordWrapping = true;
                         this._text.color = Color.black;
+                        this._text.enableAutoSizing = true;
+                        this._text.autoSizeTextContainer = false;
+                        this._text.fontSizeMin = 0.3f;
+                        this._text.fontSizeMax = 20;
+                        this._text.margin = new Vector4(3, 14, 3, 14);
+                        this._text.ForceMeshUpdate(true);
 
                         this._hukidashiCanvas.transform.SetParent(Camera.main.transform, false);
-                        this._hukidashiCanvas.transform.localScale *= 0.01f;
-                        this._hukidashiCanvas.transform.localPosition = new Vector3(0, 0, 1);
+                        this._hukidashiCanvas.transform.localScale *= 0.03f;
+                        this._hukidashiCanvas.transform.localScale = new Vector3(-this._hukidashiCanvas.transform.localScale.x, this._hukidashiCanvas.transform.localScale.y, this._hukidashiCanvas.transform.localScale.z);
+                        this._hukidashiCanvas.transform.localPosition = new Vector3(5f, 0f, 1f);
+
+                        this._hukidashiCanvas.gameObject.SetActive(false);
+
+                        HMMainThreadDispatcher.instance.Enqueue(this.SerchCamera());
                     }
                 }
             }
@@ -117,9 +151,26 @@ namespace Hukidashi
 
         private void OnMessageRecived(object sender, WebSocketSharp.MessageEventArgs e)
         {
-            //Plugin.Log.Debug($"{e.Data}");
-            //var json = JSON.Parse(e.Data);
+            var json = JSON.Parse(e.Data);
+            if (json["request-type"].Value != "SetTextGDIPlusProperties") {
+                return;
+            }
+            if (this._text) {
+                if (string.IsNullOrEmpty(json["text"])) {
+                    this._hukidashiCanvas.gameObject.SetActive(false);
+                }
+                else {
+                    this._text.text = json["text"].Value;
+                    this._text.SetAllDirty();
+                    this._hukidashiCanvas.gameObject.SetActive(true);
+                }
+            }
+        }
 
+        private IEnumerator SerchCamera()
+        {
+            yield return new WaitWhile(() => Resources.FindObjectsOfTypeAll<Camera>().FirstOrDefault(x => x.name == "cameraplus.cfg") == null);
+            this._lookTarget = this._lookTarget = Resources.FindObjectsOfTypeAll<Camera>().FirstOrDefault(x => x.name == "cameraplus.cfg");
         }
         #endregion
         //ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*
@@ -128,8 +179,9 @@ namespace Hukidashi
         private Canvas _hukidashiCanvas;
         private ImageView _hukidashiImage;
         private CurvedTextMeshPro _text;
+        private Camera _lookTarget;
 #if DEBUG
-        private List<Shader> shaders;
+        private List<Material> shaders;
         private int shaderIndex;
 #endif
         #endregion

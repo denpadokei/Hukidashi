@@ -13,7 +13,6 @@ namespace Hukidashi.Installers
         public override void InstallBindings()
         {
             this.Container.BindInterfacesAndSelfTo<HukidashiController>().FromNewComponentOnNewGameObject(nameof(HukidashiController)).AsSingle().NonLazy();
-            ;
         }
     }
 }

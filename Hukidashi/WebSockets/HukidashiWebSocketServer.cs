@@ -19,7 +19,7 @@ namespace Hukidashi.WebSockets
         private WebSocketServer _webSocketServer;
         private WebSocket _obsWebSocket;
         private HashSet<SocketBehavior> behaviors = new HashSet<SocketBehavior>();
-        private ConcurrentQueue<KeyValuePair<SocketBehavior, byte[]>> _queue = new ConcurrentQueue<KeyValuePair<SocketBehavior, byte[]>>();
+        private ConcurrentQueue<string> _queue = new ConcurrentQueue<string>();
 
         private Thread _sendThread;
 
@@ -36,13 +36,13 @@ namespace Hukidashi.WebSockets
             {
                 while (true) {
                     try {
-                        Plugin.Log.Debug($"{this._obsWebSocket?.ReadyState}");
                         if (this._obsWebSocket?.ReadyState != WebSocketState.Open) {
-                            return;
+                            continue;
                         }
-                        while (this._queue.TryDequeue(out var pair)) {
+                        while (this._queue.TryDequeue(out var data)) {
                             Plugin.Log.Debug("Send Data.");
-                            this._obsWebSocket?.Send(pair.Value);
+                            Plugin.Log.Debug($"{data}");
+                            this._obsWebSocket?.Send(data);
                             Plugin.Log.Debug("Sended Data.");
                         }
                     }
@@ -59,11 +59,8 @@ namespace Hukidashi.WebSockets
         {
             Plugin.Log.Debug(e.Data);
             var json = JSON.Parse(e.Data);
-            if (!string.IsNullOrEmpty(json["message-id"])) {
-                var id = json["message-id"].Value;
-                foreach (var b in this.behaviors) {
-                    b?.Respomce(e.RawData, comp => { });
-                }
+            foreach (var b in this.behaviors) {
+                b?.Respomce(e.Data, comp => { });
             }
         }
 
@@ -74,9 +71,9 @@ namespace Hukidashi.WebSockets
             {
                 Plugin.Log.Debug(e.Data);
                 var json = JSON.Parse(e.Data);
-                _queue.Enqueue(new KeyValuePair<SocketBehavior, byte[]>(wb, e.RawData));
+                _queue.Enqueue(e.Data);
                 OnMessageRecived?.Invoke(this, e);
-                if (this._obsWebSocket.ReadyState == WebSocketState.Closed || this._obsWebSocket.ReadyState == WebSocketState.Closing) {
+                if (this._obsWebSocket?.ReadyState != WebSocketState.Open) {
                     lock (_lockobject) {
                         this._obsWebSocket.ConnectAsync();
                     }
@@ -126,7 +123,7 @@ namespace Hukidashi.WebSockets
                 return this;
             }
 
-            public void Respomce(byte[] data, Action<bool> completed)
+            public void Respomce(string data, Action<bool> completed)
             {
                 this.SendAsync(data, completed);
             }
@@ -143,6 +140,7 @@ namespace Hukidashi.WebSockets
             }
             protected override void OnClose(CloseEventArgs e)
             {
+                Plugin.Log.Debug($"On close!");
                 this.OnRecievedMessage = null;
                 base.OnClose(e);
             }
