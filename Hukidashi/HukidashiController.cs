@@ -1,5 +1,6 @@
 ﻿using BeatSaberMarkupLanguage;
 using HMUI;
+using Hukidashi.Configuration;
 using Hukidashi.SimpleJson;
 using Hukidashi.WebSockets;
 using System;
@@ -63,6 +64,7 @@ namespace Hukidashi
         private void OnDestroy()
         {
             Plugin.Log?.Debug($"{name}: OnDestroy()");
+            PluginConfig.Instance.OnChanged -= this.OnConfigChanged;
             this._server.OnMessageRecived -= this.OnMessageRecived;
         }
         #endregion
@@ -77,6 +79,7 @@ namespace Hukidashi
                 if (this._hukidashiCanvas == null) {
                     var go = new GameObject("HukidashiCanvas", typeof(Canvas), typeof(CurvedCanvasSettings));
                     this._hukidashiCanvas = go.GetComponent<Canvas>();
+                    this._hukidashiCanvas.gameObject.layer = 5;
                     this._hukidashiCanvas.renderMode = RenderMode.WorldSpace;
                     this._hukidashiCanvas.transform.localRotation = Quaternion.Euler(0, 180, 0);
                     (this._hukidashiCanvas.transform as RectTransform).sizeDelta = new Vector2(160, 90);
@@ -110,10 +113,6 @@ namespace Hukidashi
                         this._text.transform.SetParent(vertical.transform as RectTransform, false);
                         this._text.alignment = TMPro.TextAlignmentOptions.MidlineLeft;
                         this._text.rectTransform.sizeDelta = new Vector2(130, 10);
-                        foreach (var item in Resources.FindObjectsOfTypeAll<Material>().OrderBy(x => x.name)) {
-                            Plugin.Log.Debug($"{item}");
-                        }
-
                         this._text.font.material.shader = BeatSaberUI.MainTextFont.material.shader;
                         this._text.enableWordWrapping = true;
                         this._text.color = Color.black;
@@ -125,11 +124,13 @@ namespace Hukidashi
                         this._text.ForceMeshUpdate(true);
 
                         this._hukidashiCanvas.transform.SetParent(Camera.main.transform, false);
-                        this._hukidashiCanvas.transform.localScale *= 0.03f;
+                        this._hukidashiCanvas.transform.localScale = Vector3.one * PluginConfig.Instance.HukidashiScale;
                         this._hukidashiCanvas.transform.localScale = new Vector3(-this._hukidashiCanvas.transform.localScale.x, this._hukidashiCanvas.transform.localScale.y, this._hukidashiCanvas.transform.localScale.z);
-                        this._hukidashiCanvas.transform.localPosition = new Vector3(5f, 0f, 1f);
+                        this._hukidashiCanvas.transform.localPosition = new Vector3(PluginConfig.Instance.HukidashiPosX, PluginConfig.Instance.HukidashiPosY, PluginConfig.Instance.HukidashiPosZ);
 
                         this._hukidashiCanvas.gameObject.SetActive(false);
+
+                        PluginConfig.Instance.OnChanged += this.OnConfigChanged;
 
                         HMMainThreadDispatcher.instance.Enqueue(this.SerchCamera());
                     }
@@ -139,20 +140,22 @@ namespace Hukidashi
 
             }
         }
-        #endregion
-        //ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*
-        #region // プライベートメソッド
         [Inject]
-        public void Init(HukidashiWebSocketServer server)
+        public void Constractor(HukidashiWebSocketServer server)
         {
             this._server = server;
             this._server.OnMessageRecived += this.OnMessageRecived;
         }
-
+        #endregion
+        //ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*
+        #region // プライベートメソッド
         private void OnMessageRecived(object sender, WebSocketSharp.MessageEventArgs e)
         {
             var json = JSON.Parse(e.Data);
             if (json["request-type"].Value != "SetTextGDIPlusProperties") {
+                return;
+            }
+            if (json["source"] != PluginConfig.Instance.OBSSouceName) {
                 return;
             }
             if (this._text) {
@@ -169,8 +172,20 @@ namespace Hukidashi
 
         private IEnumerator SerchCamera()
         {
-            yield return new WaitWhile(() => Resources.FindObjectsOfTypeAll<Camera>().FirstOrDefault(x => x.name == "cameraplus.cfg") == null);
-            this._lookTarget = this._lookTarget = Resources.FindObjectsOfTypeAll<Camera>().FirstOrDefault(x => x.name == "cameraplus.cfg");
+            if (string.IsNullOrEmpty(PluginConfig.Instance.TargetCameraName)) {
+                this._lookTarget = Camera.main;
+            }
+            yield return new WaitWhile(() => Resources.FindObjectsOfTypeAll<Camera>().FirstOrDefault(x => x.name == PluginConfig.Instance.TargetCameraName) == null);
+            this._lookTarget = this._lookTarget = Resources.FindObjectsOfTypeAll<Camera>().FirstOrDefault(x => x.name == PluginConfig.Instance.TargetCameraName);
+        }
+
+        private void OnConfigChanged(PluginConfig obj)
+        {
+            this._hukidashiCanvas.transform.localScale = Vector3.one * obj.HukidashiScale;
+            this._hukidashiCanvas.transform.localScale = new Vector3(-this._hukidashiCanvas.transform.localScale.x, this._hukidashiCanvas.transform.localScale.y, this._hukidashiCanvas.transform.localScale.z);
+            this._hukidashiCanvas.transform.localPosition = new Vector3(PluginConfig.Instance.HukidashiPosX, PluginConfig.Instance.HukidashiPosY, PluginConfig.Instance.HukidashiPosZ);
+            HMMainThreadDispatcher.instance.Enqueue(this.SerchCamera());
+
         }
         #endregion
         //ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*

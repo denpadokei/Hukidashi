@@ -19,32 +19,20 @@ namespace Hukidashi
         internal static Plugin Instance { get; private set; }
         internal static IPALogger Log { get; private set; }
 
+        
+        #region BSIPA Config
         [Init]
-        /// <summary>
-        /// Called when the plugin is first loaded by IPA (either when the game starts or when the plugin is enabled if it starts disabled).
-        /// [Init] methods that use a Constructor or called before regular methods like InitWithConfig.
-        /// Only use [Init] with one Constructor.
-        /// </summary>
-        public void Init(IPALogger logger, Zenjector zenjector)
+        public void InitWithConfig(IPALogger logger, Zenjector zenjector, Config conf)
         {
             Instance = this;
             Log = logger;
             Log.Info("Hukidashi initialized.");
+            Configuration.PluginConfig.Instance = conf.Generated<Configuration.PluginConfig>();
             zenjector.OnApp<HukidashiAppInstaller>();
             zenjector.OnMenu<HukidashiMenuInstaller>();
             zenjector.OnGame<HukidashiGameInstaller>();
-        }
-
-        #region BSIPA Config
-        //Uncomment to use BSIPA's config
-        /*
-        [Init]
-        public void InitWithConfig(Config conf)
-        {
-            Configuration.PluginConfig.Instance = conf.Generated<Configuration.PluginConfig>();
             Log.Debug("Config loaded");
         }
-        */
         #endregion
 
         [OnStart]

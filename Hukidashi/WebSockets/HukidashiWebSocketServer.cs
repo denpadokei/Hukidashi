@@ -1,4 +1,5 @@
-﻿using Hukidashi.SimpleJson;
+﻿using Hukidashi.Configuration;
+using Hukidashi.SimpleJson;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -14,8 +15,6 @@ namespace Hukidashi.WebSockets
 {
     public class HukidashiWebSocketServer : IDisposable
     {
-        private const int _port = 4443;
-        private const int _obsPort = 4444;
         private WebSocketServer _webSocketServer;
         private WebSocket _obsWebSocket;
         private HashSet<SocketBehavior> behaviors = new HashSet<SocketBehavior>();
@@ -28,9 +27,9 @@ namespace Hukidashi.WebSockets
 
         public HukidashiWebSocketServer()
         {
-            this._webSocketServer = new WebSocketServer($"ws://127.0.0.1:{_port}");
+            this._webSocketServer = new WebSocketServer($"ws://127.0.0.1:{PluginConfig.Instance.ModPort}");
             this._webSocketServer.AddWebSocketService<SocketBehavior>("/", this.BehavierInit);
-            this._obsWebSocket = new WebSocket($"ws://127.0.0.1:{_obsPort}/");
+            this._obsWebSocket = new WebSocket($"ws://127.0.0.1:{PluginConfig.Instance.OBSPort}/");
             this._obsWebSocket.OnMessage += this.OnObsWebSocketOnMessage;
             this._sendThread = new Thread(new ThreadStart(() =>
             {
@@ -40,10 +39,7 @@ namespace Hukidashi.WebSockets
                             continue;
                         }
                         while (this._queue.TryDequeue(out var data)) {
-                            Plugin.Log.Debug("Send Data.");
-                            Plugin.Log.Debug($"{data}");
                             this._obsWebSocket?.Send(data);
-                            Plugin.Log.Debug("Sended Data.");
                         }
                     }
                     catch (Exception e) {
