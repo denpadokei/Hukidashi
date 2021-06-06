@@ -12,6 +12,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using Zenject;
 
@@ -37,6 +38,8 @@ namespace Hukidashi
             // For this particular MonoBehaviour, we only want one instance to exist at any time, so store a reference to it in a static property
             //   and destroy any that are created while one already exists.
             Plugin.Log?.Debug($"{name}: Awake()");
+            this._isInGame = SceneManager.GetActiveScene().name == "GameCore";
+            SceneManager.activeSceneChanged += this.SceneManager_activeSceneChanged;
         }
 
         private void Update()
@@ -66,6 +69,24 @@ namespace Hukidashi
             Plugin.Log?.Debug($"{name}: OnDestroy()");
             PluginConfig.Instance.OnChanged -= this.OnConfigChanged;
             this._server.OnMessageRecived -= this.OnMessageRecived;
+            SceneManager.activeSceneChanged -= this.SceneManager_activeSceneChanged;
+            if (this._hukidashiCanvas != null) {
+                Destroy(this._hukidashiCanvas.gameObject);
+            }
+        }
+
+        private void OnEnable()
+        {
+            if (this._hukidashiCanvas != null) {
+                this._hukidashiCanvas.gameObject.SetActive(true);
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (this._hukidashiCanvas != null) {
+                this._hukidashiCanvas.gameObject.SetActive(false);
+            }
         }
         #endregion
         //ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*
@@ -124,9 +145,7 @@ namespace Hukidashi
                         this._text.ForceMeshUpdate(true);
 
                         this._hukidashiCanvas.transform.SetParent(Camera.main.transform, false);
-                        this._hukidashiCanvas.transform.localScale = Vector3.one * PluginConfig.Instance.HukidashiScale;
-                        this._hukidashiCanvas.transform.localScale = new Vector3(-this._hukidashiCanvas.transform.localScale.x, this._hukidashiCanvas.transform.localScale.y, this._hukidashiCanvas.transform.localScale.z);
-                        this._hukidashiCanvas.transform.localPosition = new Vector3(PluginConfig.Instance.HukidashiPosX, PluginConfig.Instance.HukidashiPosY, PluginConfig.Instance.HukidashiPosZ);
+                        this.UpdateHukidashi(this._isInGame);
 
                         this._hukidashiCanvas.gameObject.SetActive(false);
 
@@ -170,22 +189,50 @@ namespace Hukidashi
             }
         }
 
-        private IEnumerator SerchCamera()
+        private IEnumerator SerchCamera(bool isInGame = false)
         {
-            if (string.IsNullOrEmpty(PluginConfig.Instance.TargetCameraName)) {
-                this._lookTarget = Camera.main;
+            if (isInGame) {
+                if (string.IsNullOrEmpty(PluginConfig.Instance.GameTargetCameraName)) {
+                    this._lookTarget = Camera.main;
+                }
+                else {
+                    yield return new WaitWhile(() => Resources.FindObjectsOfTypeAll<Camera>().FirstOrDefault(x => x.name == PluginConfig.Instance.GameTargetCameraName) == null);
+                    this._lookTarget = this._lookTarget = Resources.FindObjectsOfTypeAll<Camera>().FirstOrDefault(x => x.name == PluginConfig.Instance.GameTargetCameraName);
+                }
             }
-            yield return new WaitWhile(() => Resources.FindObjectsOfTypeAll<Camera>().FirstOrDefault(x => x.name == PluginConfig.Instance.TargetCameraName) == null);
-            this._lookTarget = this._lookTarget = Resources.FindObjectsOfTypeAll<Camera>().FirstOrDefault(x => x.name == PluginConfig.Instance.TargetCameraName);
+            else {
+                if (string.IsNullOrEmpty(PluginConfig.Instance.MenuTargetCameraName)) {
+                    this._lookTarget = Camera.main;
+                }
+                else {
+                    yield return new WaitWhile(() => Resources.FindObjectsOfTypeAll<Camera>().FirstOrDefault(x => x.name == PluginConfig.Instance.MenuTargetCameraName) == null);
+                    this._lookTarget = this._lookTarget = Resources.FindObjectsOfTypeAll<Camera>().FirstOrDefault(x => x.name == PluginConfig.Instance.MenuTargetCameraName);
+                }
+            }
         }
-
+        private void SceneManager_activeSceneChanged(Scene arg0, Scene arg1)
+        {
+            this._isInGame = arg1.name == "GameCore";
+            HMMainThreadDispatcher.instance.Enqueue(this.SerchCamera(this._isInGame));
+        }
         private void OnConfigChanged(PluginConfig obj)
         {
-            this._hukidashiCanvas.transform.localScale = Vector3.one * obj.HukidashiScale;
-            this._hukidashiCanvas.transform.localScale = new Vector3(-this._hukidashiCanvas.transform.localScale.x, this._hukidashiCanvas.transform.localScale.y, this._hukidashiCanvas.transform.localScale.z);
-            this._hukidashiCanvas.transform.localPosition = new Vector3(PluginConfig.Instance.HukidashiPosX, PluginConfig.Instance.HukidashiPosY, PluginConfig.Instance.HukidashiPosZ);
-            HMMainThreadDispatcher.instance.Enqueue(this.SerchCamera());
+            this.UpdateHukidashi(this._isInGame);
+        }
 
+        private void UpdateHukidashi(bool isInGame = false)
+        {
+            if (isInGame) {
+                this._hukidashiCanvas.transform.localScale = Vector3.one * PluginConfig.Instance.GameHukidashiScale;
+                this._hukidashiCanvas.transform.localScale = new Vector3(-this._hukidashiCanvas.transform.localScale.x, this._hukidashiCanvas.transform.localScale.y, this._hukidashiCanvas.transform.localScale.z);
+                this._hukidashiCanvas.transform.localPosition = new Vector3(PluginConfig.Instance.GameHukidashiPosX, PluginConfig.Instance.GameHukidashiPosY, PluginConfig.Instance.GameHukidashiPosZ);
+            }
+            else {
+                this._hukidashiCanvas.transform.localScale = Vector3.one * PluginConfig.Instance.MenuHukidashiScale;
+                this._hukidashiCanvas.transform.localScale = new Vector3(-this._hukidashiCanvas.transform.localScale.x, this._hukidashiCanvas.transform.localScale.y, this._hukidashiCanvas.transform.localScale.z);
+                this._hukidashiCanvas.transform.localPosition = new Vector3(PluginConfig.Instance.MenuHukidashiPosX, PluginConfig.Instance.MenuHukidashiPosY, PluginConfig.Instance.MenuHukidashiPosZ);
+            }
+            HMMainThreadDispatcher.instance.Enqueue(this.SerchCamera(isInGame));
         }
         #endregion
         //ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*
@@ -195,6 +242,7 @@ namespace Hukidashi
         private ImageView _hukidashiImage;
         private CurvedTextMeshPro _text;
         private Camera _lookTarget;
+        private bool _isInGame;
 #if DEBUG
         private List<Material> shaders;
         private int shaderIndex;
