@@ -171,21 +171,23 @@ namespace Hukidashi
         private void OnMessageRecived(object sender, WebSocketSharp.MessageEventArgs e)
         {
             var json = JSON.Parse(e.Data);
-            if (json["request-type"].Value != "SetTextGDIPlusProperties") {
+            if (!this._text) {
                 return;
             }
-            if (json["source"] != PluginConfig.Instance.OBSSouceName) {
-                return;
-            }
-            if (this._text) {
-                if (string.IsNullOrEmpty(json["text"])) {
-                    this._hukidashiCanvas.gameObject.SetActive(false);
-                }
-                else {
-                    this._text.text = json["text"].Value;
-                    this._text.SetAllDirty();
-                    this._hukidashiCanvas.gameObject.SetActive(true);
-                }
+            if (json?.IsNull == false) {
+                HMMainThreadDispatcher.instance.Enqueue(() =>
+                {
+                    if (json["type"].Value == "Show") {
+                        this._text.text = json["text"].Value;
+                        this._text.SetAllDirty();
+                        this._hukidashiCanvas.gameObject.SetActive(true);
+
+                    }
+                    else {
+                        this._text.text = json["text"].Value;
+                        this._hukidashiCanvas.gameObject.SetActive(false);
+                    }
+                });
             }
         }
 

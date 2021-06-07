@@ -18,10 +18,8 @@ namespace Hukidashi.Configuration
         public virtual float GameHukidashiPosY { get; set; } = 0.3f;
         public virtual float GameHukidashiPosZ { get; set; } = 1f;
         public virtual string GameTargetCameraName { get; set; } = "cameraplus.cfg";
-        public virtual string OBSSouceName { get; set; } = "txt_jp";
-        
+
         public virtual int ModPort { get; set; } = 4443;
-        public virtual int OBSPort { get; set; } = 4444;
 
         public event Action<PluginConfig> OnChanged;
 
@@ -60,9 +58,7 @@ namespace Hukidashi.Configuration
             this.GameHukidashiPosZ = other.GameHukidashiPosZ;
             this.GameTargetCameraName = other.GameTargetCameraName;
 
-            this.OBSSouceName = other.OBSSouceName;
             this.ModPort = other.ModPort;
-            this.OBSPort = other.OBSPort;
         }
     }
 }

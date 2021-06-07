@@ -16,12 +16,6 @@ namespace Hukidashi.WebSockets
     public class HukidashiWebSocketServer : IDisposable
     {
         private WebSocketServer _webSocketServer;
-        private WebSocket _obsWebSocket;
-        private HashSet<SocketBehavior> behaviors = new HashSet<SocketBehavior>();
-        private ConcurrentQueue<string> _queue = new ConcurrentQueue<string>();
-
-        private Thread _sendThread;
-
         public event OnRecieveMessageHandler OnMessageRecived;
         private readonly static object _lockobject = new object();
 
@@ -29,51 +23,16 @@ namespace Hukidashi.WebSockets
         {
             this._webSocketServer = new WebSocketServer($"ws://127.0.0.1:{PluginConfig.Instance.ModPort}");
             this._webSocketServer.AddWebSocketService<SocketBehavior>("/", this.BehavierInit);
-            this._obsWebSocket = new WebSocket($"ws://127.0.0.1:{PluginConfig.Instance.OBSPort}/");
-            this._obsWebSocket.OnMessage += this.OnObsWebSocketOnMessage;
-            this._sendThread = new Thread(new ThreadStart(() =>
-            {
-                while (true) {
-                    try {
-                        if (this._obsWebSocket?.ReadyState != WebSocketState.Open) {
-                            continue;
-                        }
-                        while (this._queue.TryDequeue(out var data)) {
-                            this._obsWebSocket?.Send(data);
-                        }
-                    }
-                    catch (Exception e) {
-                        Plugin.Log.Error(e);
-                    }
-                    Thread.Sleep(1);
-                }
-            }));
-            this._sendThread.Start();
+            
             this._webSocketServer.Start();
-        }
-        private void OnObsWebSocketOnMessage(object sender, MessageEventArgs e)
-        {
-            Plugin.Log.Debug(e.Data);
-            var json = JSON.Parse(e.Data);
-            foreach (var b in this.behaviors) {
-                b?.Respomce(e.Data, comp => { });
-            }
         }
 
         private void BehavierInit(SocketBehavior wb)
         {
-            this.behaviors.Add(wb);
             wb.Init((s, e) =>
             {
                 Plugin.Log.Debug(e.Data);
-                var json = JSON.Parse(e.Data);
-                _queue.Enqueue(e.Data);
                 OnMessageRecived?.Invoke(this, e);
-                if (this._obsWebSocket?.ReadyState != WebSocketState.Open) {
-                    lock (_lockobject) {
-                        this._obsWebSocket.ConnectAsync();
-                    }
-                }
             });
         }
 
@@ -85,8 +44,6 @@ namespace Hukidashi.WebSockets
                 if (disposing) {
                     // TODO: マネージド状態を破棄します (マネージド オブジェクト)
                     this._webSocketServer?.Stop();
-                    this._obsWebSocket.Close();
-                    this._sendThread.Abort();
                 }
 
                 // TODO: アンマネージド リソース (アンマネージド オブジェクト) を解放し、ファイナライザーをオーバーライドします
