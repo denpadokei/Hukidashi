@@ -128,7 +128,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Installers\HukidashiAppInstaller.cs" />
-    <Compile Include="Installers\HukidashiGameInstaller.cs" />
     <Compile Include="Installers\HukidashiMenuInstaller.cs" />
     <Compile Include="Plugin.cs" />
     <Compile Include="Configuration\PluginConfig.cs" />

@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Zenject;
-using SiraUtil;
+﻿using Zenject;
 
 namespace Hukidashi.Installers
 {
@@ -12,7 +6,7 @@ namespace Hukidashi.Installers
     {
         public override void InstallBindings()
         {
-            this.Container.BindInterfacesAndSelfTo<HukidashiController>().FromNewComponentOnNewGameObject(nameof(HukidashiController)).AsSingle().NonLazy();
+            this.Container.BindInterfacesAndSelfTo<HukidashiController>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
         }
     }
 }

@@ -1,6 +1,6 @@
-﻿using System;
+﻿using IPA.Config.Stores;
+using System;
 using System.Runtime.CompilerServices;
-using IPA.Config.Stores;
 
 [assembly: InternalsVisibleTo(GeneratedStore.AssemblyVisibilityTarget)]
 namespace Hukidashi.Configuration
@@ -12,12 +12,12 @@ namespace Hukidashi.Configuration
         public virtual float MenuHukidashiPosX { get; set; } = 5f;
         public virtual float MenuHukidashiPosY { get; set; } = 0.3f;
         public virtual float MenuHukidashiPosZ { get; set; } = 1f;
-        public virtual string MenuTargetCameraName { get; set; } = "cameraplus.cfg";
+        public virtual string MenuTargetCameraName { get; set; } = "cameraplus.json";
         public virtual float GameHukidashiScale { get; set; } = 0.03f;
         public virtual float GameHukidashiPosX { get; set; } = 5f;
         public virtual float GameHukidashiPosY { get; set; } = 0.3f;
         public virtual float GameHukidashiPosZ { get; set; } = 1f;
-        public virtual string GameTargetCameraName { get; set; } = "cameraplus.cfg";
+        public virtual string GameTargetCameraName { get; set; } = "cameraplus.json";
 
         public virtual int ModPort { get; set; } = 4443;
 

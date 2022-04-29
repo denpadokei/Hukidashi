@@ -3,12 +3,6 @@ using IPA;
 using IPA.Config;
 using IPA.Config.Stores;
 using SiraUtil.Zenject;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using UnityEngine;
-using UnityEngine.SceneManagement;
 using IPALogger = IPA.Logging.Logger;
 
 namespace Hukidashi
@@ -19,7 +13,7 @@ namespace Hukidashi
         internal static Plugin Instance { get; private set; }
         internal static IPALogger Log { get; private set; }
 
-        
+
         #region BSIPA Config
         [Init]
         public void InitWithConfig(IPALogger logger, Zenjector zenjector, Config conf)
@@ -28,9 +22,8 @@ namespace Hukidashi
             Log = logger;
             Log.Info("Hukidashi initialized.");
             Configuration.PluginConfig.Instance = conf.Generated<Configuration.PluginConfig>();
-            zenjector.OnApp<HukidashiAppInstaller>();
-            zenjector.OnMenu<HukidashiMenuInstaller>();
-            zenjector.OnGame<HukidashiGameInstaller>();
+            zenjector.Install<HukidashiAppInstaller>(Location.App);
+            zenjector.Install<HukidashiMenuInstaller>(Location.Menu | Location.Player);
             Log.Debug("Config loaded");
         }
         #endregion
@@ -39,8 +32,6 @@ namespace Hukidashi
         public void OnApplicationStart()
         {
             Log.Debug("OnApplicationStart");
-            new GameObject("HukidashiController").AddComponent<HukidashiController>();
-
         }
 
         [OnExit]
