@@ -1,29 +1,20 @@
 ﻿using Hukidashi.Configuration;
-using Hukidashi.SimpleJson;
 using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using WebSocketSharp;
 using WebSocketSharp.Server;
-using Zenject;
 
 namespace Hukidashi.WebSockets
 {
     public class HukidashiWebSocketServer : IDisposable
     {
-        private WebSocketServer _webSocketServer;
+        private readonly WebSocketServer _webSocketServer;
         public event OnRecieveMessageHandler OnMessageRecived;
-        private readonly static object _lockobject = new object();
 
         public HukidashiWebSocketServer()
         {
             this._webSocketServer = new WebSocketServer($"ws://127.0.0.1:{PluginConfig.Instance.ModPort}");
             this._webSocketServer.AddWebSocketService<SocketBehavior>("/", this.BehavierInit);
-            
+
             this._webSocketServer.Start();
         }
 
@@ -36,33 +27,22 @@ namespace Hukidashi.WebSockets
             });
         }
 
-        private bool disposedValue;
-        
+        private bool _disposedValue;
+
         protected virtual void Dispose(bool disposing)
         {
-            if (!disposedValue) {
+            if (!this._disposedValue) {
                 if (disposing) {
-                    // TODO: マネージド状態を破棄します (マネージド オブジェクト)
                     this._webSocketServer?.Stop();
                 }
-
-                // TODO: アンマネージド リソース (アンマネージド オブジェクト) を解放し、ファイナライザーをオーバーライドします
-                // TODO: 大きなフィールドを null に設定します
-                disposedValue = true;
+                this._disposedValue = true;
             }
         }
-
-        // // TODO: 'Dispose(bool disposing)' にアンマネージド リソースを解放するコードが含まれる場合にのみ、ファイナライザーをオーバーライドします
-        // ~WebSocketServer()
-        // {
-        //     // このコードを変更しないでください。クリーンアップ コードを 'Dispose(bool disposing)' メソッドに記述します
-        //     Dispose(disposing: false);
-        // }
 
         public void Dispose()
         {
             // このコードを変更しないでください。クリーンアップ コードを 'Dispose(bool disposing)' メソッドに記述します
-            Dispose(disposing: true);
+            this.Dispose(disposing: true);
             GC.SuppressFinalize(this);
         }
 

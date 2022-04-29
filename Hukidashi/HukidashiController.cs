@@ -5,12 +5,8 @@ using Hukidashi.SimpleJson;
 using Hukidashi.WebSockets;
 using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -22,7 +18,7 @@ namespace Hukidashi
     /// Monobehaviours (scripts) are added to GameObjects.
     /// For a full list of Messages a Monobehaviour can receive from the game, see https://docs.unity3d.com/ScriptReference/MonoBehaviour.html.
     /// </summary>
-    public class HukidashiController : MonoBehaviour, IInitializable
+    public class HukidashiController : MonoBehaviour, IInitializable, IDisposable
     {
         //ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*
         #region // プロパティ
@@ -30,35 +26,12 @@ namespace Hukidashi
         //ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*
         // These methods are automatically called by Unity, you should remove any you aren't using.
         #region Monobehaviour Messages
-        /// <summary>
-        /// Only ever called once, mainly used to initialize variables.
-        /// </summary>
-        private void Awake()
-        {
-            // For this particular MonoBehaviour, we only want one instance to exist at any time, so store a reference to it in a static property
-            //   and destroy any that are created while one already exists.
-            Plugin.Log?.Debug($"{name}: Awake()");
-            this._isInGame = SceneManager.GetActiveScene().name == "GameCore";
-            SceneManager.activeSceneChanged += this.SceneManager_activeSceneChanged;
-        }
-
         private void Update()
         {
-            if (!_lookTarget) {
+            if (!this._lookTarget) {
                 return;
             }
-            this._hukidashiCanvas.transform.LookAt(_lookTarget.transform.position);
-#if DEBUG
-            if (Input.GetKeyDown(KeyCode.N)) {
-                if (this.shaders.Count <= (uint)this.shaderIndex) {
-                    this.shaderIndex = 0;
-                }
-                var shader = this.shaders.ElementAt(shaderIndex);
-                Plugin.Log.Debug($"index {shaderIndex}, {shader}");
-                this._hukidashiImage.material = shader;
-                shaderIndex++;
-            }
-#endif
+            this._hukidashiCanvas.transform.LookAt(this._lookTarget.transform.position);
         }
 
         /// <summary>
@@ -66,23 +39,13 @@ namespace Hukidashi
         /// </summary>
         private void OnDestroy()
         {
-            Plugin.Log?.Debug($"{name}: OnDestroy()");
-            PluginConfig.Instance.OnChanged -= this.OnConfigChanged;
-            this._server.OnMessageRecived -= this.OnMessageRecived;
-            SceneManager.activeSceneChanged -= this.SceneManager_activeSceneChanged;
+            Plugin.Log?.Debug($"{this.name}: OnDestroy()");
             if (this._hukidashiCanvas != null) {
                 Destroy(this._hukidashiCanvas.gameObject);
             }
         }
 
-        private void OnEnable()
-        {
-            if (this._hukidashiCanvas != null) {
-                this._hukidashiCanvas.gameObject.SetActive(true);
-            }
-        }
-
-        private void OnDisable()
+        protected void OnDisable()
         {
             if (this._hukidashiCanvas != null) {
                 this._hukidashiCanvas.gameObject.SetActive(false);
@@ -97,6 +60,13 @@ namespace Hukidashi
         public void Initialize()
         {
             try {
+                this._server.OnMessageRecived -= this.OnMessageRecived;
+                this._server.OnMessageRecived += this.OnMessageRecived;
+                PluginConfig.Instance.OnChanged -= this.OnConfigChanged;
+                PluginConfig.Instance.OnChanged += this.OnConfigChanged;
+                SceneManager.activeSceneChanged -= this.SceneManager_activeSceneChanged;
+                SceneManager.activeSceneChanged += this.SceneManager_activeSceneChanged;
+                this._isInGame = SceneManager.GetActiveScene().name == "GameCore";
                 if (this._hukidashiCanvas == null) {
                     var go = new GameObject("HukidashiCanvas", typeof(Canvas), typeof(CurvedCanvasSettings));
                     this._hukidashiCanvas = go.GetComponent<Canvas>();
@@ -116,17 +86,14 @@ namespace Hukidashi
                         tex.LoadImage(rowData);
                         var rect = new Rect(Vector2.zero, new Vector2(tex.width, tex.height));
                         this._hukidashiImage.sprite = Sprite.Create(tex, rect, Vector2.one / 2);
-#if DEBUG
-                        this.shaders = Resources.FindObjectsOfTypeAll<Material>().OrderBy(x => x.name).ToList();
-#endif
                         this._hukidashiImage.material = Resources.FindObjectsOfTypeAll<Material>().FirstOrDefault(m => m.name == "UINoGlow");
-                        
-                        this._hukidashiImage.transform.SetParent(_hukidashiCanvas.transform as RectTransform, false);
-                        
+
+                        this._hukidashiImage.transform.SetParent(this._hukidashiCanvas.transform as RectTransform, false);
+
                         this._hukidashiImage.rectTransform.sizeDelta = new Vector2(160, 90);
                         var vertical = new GameObject().AddComponent<VerticalLayoutGroup>();
                         vertical.transform.SetParent(this._hukidashiImage.transform as RectTransform, false);
-                        
+
                         this._text = new GameObject().AddComponent<CurvedTextMeshPro>();
                         if (FontManager.TryGetTMPFontByFamily("Segoe UI", out var font)) {
                             this._text.font = GameObject.Instantiate(font);
@@ -149,27 +116,28 @@ namespace Hukidashi
 
                         this._hukidashiCanvas.gameObject.SetActive(false);
 
-                        PluginConfig.Instance.OnChanged += this.OnConfigChanged;
-
                         HMMainThreadDispatcher.instance.Enqueue(this.SerchCamera());
                     }
                 }
             }
             catch (Exception e) {
-
+                Plugin.Log.Error(e);
             }
         }
         [Inject]
         public void Constractor(HukidashiWebSocketServer server)
         {
             this._server = server;
-            this._server.OnMessageRecived += this.OnMessageRecived;
         }
         #endregion
         //ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*
         #region // プライベートメソッド
         private void OnMessageRecived(object sender, WebSocketSharp.MessageEventArgs e)
         {
+            if (!this.isActiveAndEnabled) {
+                return;
+            }
+
             var json = JSON.Parse(e.Data);
             if (!this._text) {
                 return;
@@ -245,13 +213,29 @@ namespace Hukidashi
         private CurvedTextMeshPro _text;
         private Camera _lookTarget;
         private bool _isInGame;
-#if DEBUG
-        private List<Material> shaders;
-        private int shaderIndex;
-#endif
+        private bool _disposedValue;
         #endregion
         //ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*ﾟ+｡｡+ﾟ*｡+ﾟ ﾟ+｡*
         #region // 構築・破棄
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!this._disposedValue) {
+                if (disposing) {
+                    PluginConfig.Instance.OnChanged -= this.OnConfigChanged;
+                    SceneManager.activeSceneChanged -= this.SceneManager_activeSceneChanged;
+                    if (this._server != null) {
+                        this._server.OnMessageRecived -= this.OnMessageRecived;
+                    }
+                }
+                this._disposedValue = true;
+            }
+        }
+        public void Dispose()
+        {
+            // このコードを変更しないでください。クリーンアップ コードを 'Dispose(bool disposing)' メソッドに記述します
+            this.Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
         #endregion
     }
 }
